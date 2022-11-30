@@ -92,7 +92,7 @@ HTTP_Response *handle_request(string req) {
         cout<<ans<<endl;
 
         response->body=ans.c_str();
-        response->content_length=response->body.length();
+        response->content_length=to_string(response->body.length());
 
         delete request;
 
@@ -120,8 +120,8 @@ HTTP_Response *handle_request(string req) {
     */
 
     response->body=ans.c_str();
-    response->content_length=response->body.length();
-
+    response->content_length=to_string(response->body.length());
+    // cout<<response->content_length<<endl;
 
   }
 
@@ -140,10 +140,10 @@ HTTP_Response *handle_request(string req) {
     my_string << myfile.rdbuf();
     ans=my_string.str();
     // 
-    cout<<ans<<endl;
+    // cout<<ans<<endl;
 
     response->body=ans.c_str();
-    response->content_length=response->body.length();
+    response->content_length=to_string(response->body.length());
 
     
   }

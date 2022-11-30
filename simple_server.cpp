@@ -8,16 +8,22 @@
 #include <netinet/in.h>
 
 #include <pthread.h>
-pthread_cond_t fill_buf;
+pthread_cond_t fill_buf,consume_buf;
 pthread_mutex_t buf_lock;
 
+#define Max_queue_size 10000
+#define NUM_THRDS 10
+pthread_t tid[NUM_THRDS];
 
 queue<int> shared_queue;
+int count_var=0;
 
 void error(char *msg) {
   perror(msg);
   exit(1);
 }
+
+
 
 void * startFun(void *args){
   // int newsockfd=*((int *)args);
@@ -25,10 +31,12 @@ void * startFun(void *args){
     while (1)
     {
         pthread_mutex_lock(&buf_lock);
-      while(shared_queue.empty())
+      while(count_var==0)
         pthread_cond_wait(&fill_buf,&buf_lock);
       int newsockfd=shared_queue.front();
       shared_queue.pop();
+      count_var--;
+      pthread_cond_signal(&consume_buf);
       pthread_mutex_unlock(&buf_lock);
 
       char buffer[1024];
@@ -42,36 +50,55 @@ void * startFun(void *args){
         // return;
       }
       else if (n < 0){
-        error("ERROR reading from socket");
+        perror("ERROR reading from socket");
+        close(newsockfd);
       }
       else{
       printf("Here is the message: %s", buffer);
       
       /* send reply to client */
-      HTTP_Request *request = new HTTP_Request(buffer);
+      // HTTP_Request *request = new HTTP_Request(buffer);
       HTTP_Response *response = handle_request(string(buffer));
       string buff2= response->get_string();
-
+      delete response;
 
       n = write(newsockfd,buff2.c_str(),buff2.length());
       if (n < 0)
-        error("ERROR writing to socket");
-
-      close(newsockfd); 
+        perror("ERROR writing to socket");
+        
+        close(newsockfd); 
       }
+      
+      // printf("going to sleep\n");
+      // sleep(20);
     }
+    
     
 
 }
 
+// void sig_handler(int signal){
+//       void *returned_data;
+
+//       for(int i=0;i<10;i++){
+//         pthread_join(tid[i],&returned_data);
+//       }
+
+//       free(returned_data);
+//       exit(0);
+
+// }
+
 
 int main(int argc, char *argv[]) {
+
+  // signal(SIGINT,sig_handler);
   int sockfd, newsockfd, portno;
   socklen_t clilen;
   char buffer[256];
   struct sockaddr_in serv_addr, cli_addr;
   int n;
-  pthread_t tid[10];
+  bool flag;
 
   pthread_mutex_init(&buf_lock,NULL);
   pthread_cond_init(&fill_buf,NULL);
@@ -103,11 +130,11 @@ int main(int argc, char *argv[]) {
 
   /* listen for incoming connection requests */
 
-  for(int i=0;i<10;i++){
+  for(int i=0;i<NUM_THRDS;i++){
     pthread_create(&tid[i],NULL,startFun,NULL);
   }
 
-  listen(sockfd, 5);
+  listen(sockfd, 2000);
   while (1)
   {
       /* listen for incoming connection requests */
@@ -119,7 +146,10 @@ int main(int argc, char *argv[]) {
         error("ERROR on accept");
 
       pthread_mutex_lock(&buf_lock);
+      while(count_var==Max_queue_size)
+        pthread_cond_wait(&consume_buf,&buf_lock);
       shared_queue.push(newsockfd);
+      count_var++;
       pthread_cond_signal(&fill_buf);
       pthread_mutex_unlock(&buf_lock);
       
@@ -128,10 +158,11 @@ int main(int argc, char *argv[]) {
   }
   
 
-  
-  // for(int i=0;i<10;i++){
-  //   pthread_join(tid[i],NULL);
-  // }
+  void * returned_data;
+  for(int i=0;i<10;i++){
+    pthread_join(tid[i],&returned_data);
+  }
+  free(returned_data);
 
   close(sockfd);
   close(newsockfd);
