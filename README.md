@@ -1,4 +1,4 @@
-# Simple_Server_cpp
+# MultiThreaded_Web_Server_cpp
 
 Build a multi-threaded web server. The web server is able to handle simple HTTP requests and return suitable responses. 
 It uses a master-worker thread pool architecture to handle multiple concurrent clients.
